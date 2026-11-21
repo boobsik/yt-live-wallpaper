@@ -1,0 +1,35 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>yt-live-wallpaper</title>
+    <link rel="stylesheet" href="wallpaper.css" />
+  </head>
+  <body>
+    <div id="stage" class="stage" data-fit="cover" data-engine="idle">
+      <video
+        id="video-a"
+        class="layer"
+        muted
+        playsinline
+        preload="auto"
+        disablepictureinpicture
+      ></video>
+      <video
+        id="video-b"
+        class="layer"
+        muted
+        playsinline
+        preload="auto"
+        disablepictureinpicture
+      ></video>
+
+      <div id="embed-container" class="embed-container" hidden>
+        <div id="player"></div>
+      </div>
+    </div>
+
+    <script src="wallpaper.js"></script>
+  </body>
+</html>

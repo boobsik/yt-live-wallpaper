@@ -1,0 +1,17 @@
+# Dependencies / build output
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+.tmp/
+
+# OS / IDE noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

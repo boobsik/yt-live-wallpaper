@@ -1,0 +1,16 @@
+{
+  "name": "yt-live-wallpaper",
+  "private": true,
+  "version": "0.1.0",
+  "description": "YouTube videos as Windows live wallpapers (Tauri v2 + WebView2)",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}

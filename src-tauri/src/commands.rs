@@ -164,10 +164,19 @@ pub async fn set_quality(app: AppHandle, quality: String) -> Result<Playback, St
 }
 
 #[tauri::command]
-pub async fn get_runtime_stats() -> Telemetry {
-    tauri::async_runtime::spawn_blocking(stats::sample)
+pub async fn get_runtime_stats(app: AppHandle) -> Telemetry {
+    let mut telemetry = tauri::async_runtime::spawn_blocking(stats::sample)
         .await
-        .unwrap_or_default()
+        .unwrap_or_default();
+    let playback = app.state::<AppState>().lock().playback.clone();
+    telemetry.engine = playback.engine;
+    telemetry.engine_reason = playback.engine_reason;
+    telemetry
+}
+
+#[tauri::command]
+pub fn wallpaper_playing(app: AppHandle, id: Option<String>) {
+    runtime::reveal_window(&app, id);
 }
 
 #[tauri::command]

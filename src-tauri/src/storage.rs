@@ -1,6 +1,8 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use chrono::Utc;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -21,6 +23,23 @@ pub fn library_path(app: &AppHandle) -> PathBuf {
 
 pub fn settings_path(app: &AppHandle) -> PathBuf {
     data_dir(app).join("settings.json")
+}
+
+pub fn log_path(app: &AppHandle) -> PathBuf {
+    data_dir(app).join("engine.log")
+}
+
+/// Appends one timestamped line to `engine.log`. Diagnostics are best-effort:
+/// a full disk must never stop playback.
+pub fn append_log(app: &AppHandle, message: &str) {
+    let line = format!("[{}] {}\n", Utc::now().to_rfc3339(), message);
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path(app))
+    {
+        let _ = file.write_all(line.as_bytes());
+    }
 }
 
 pub fn load_json<T: DeserializeOwned, F: FnOnce() -> T>(path: &Path, fallback: F) -> T {

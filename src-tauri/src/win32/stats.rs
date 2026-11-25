@@ -187,10 +187,7 @@ pub fn sample() -> Telemetry {
                 cpu = (seconds / wall / cores() * 100.0).clamp(0.0, 100.0);
             }
         }
-        *guard = Some(CpuSample {
-            at: now,
-            ticks,
-        });
+        *guard = Some(CpuSample { at: now, ticks });
     }
 
     Telemetry {
@@ -202,6 +199,8 @@ pub fn sample() -> Telemetry {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_millis() as u64)
             .unwrap_or(0),
+        engine: "idle".to_string(),
+        engine_reason: None,
     }
 }
 

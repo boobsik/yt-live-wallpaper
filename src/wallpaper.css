@@ -78,6 +78,16 @@ body {
   inset: 0;
 }
 
+/* Blocks every YouTube overlay from receiving mouse input. The wallpaper
+   window itself is WS_EX_TRANSPARENT, so desktop clicks still pass through. */
+.embed-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  pointer-events: auto;
+}
+
 #player iframe {
   position: absolute;
   top: 50%;

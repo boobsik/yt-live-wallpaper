@@ -93,6 +93,8 @@ pub struct Playback {
     pub fit: String,
     /// "idle" | "direct" (yt-dlp stream) | "embed" (YouTube IFrame API)
     pub engine: String,
+    /// Why this engine was selected (yt-dlp missing/error, forced fallback...).
+    pub engine_reason: Option<String>,
     pub stream_url: Option<String>,
     pub paused: bool,
     /// "user" | "fullscreen" | null
@@ -112,6 +114,7 @@ impl Default for Playback {
             quality: "1080p".to_string(),
             fit: "cover".to_string(),
             engine: "idle".to_string(),
+            engine_reason: None,
             stream_url: None,
             paused: false,
             pause_reason: None,
@@ -145,6 +148,9 @@ pub struct Telemetry {
     pub cpu: f64,
     pub processes: u32,
     pub sampled_at: u64,
+    /// Playback engine and the reason it was chosen, mirrored from `Playback`.
+    pub engine: String,
+    pub engine_reason: Option<String>,
 }
 
 impl Default for Telemetry {
@@ -155,6 +161,8 @@ impl Default for Telemetry {
             cpu: 0.0,
             processes: 0,
             sampled_at: 0,
+            engine: "idle".to_string(),
+            engine_reason: None,
         }
     }
 }

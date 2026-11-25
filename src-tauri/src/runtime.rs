@@ -217,6 +217,28 @@ fn hide_window(app: &AppHandle) {
     }
 }
 
+/// Shows the wallpaper only after the renderer confirms playback. Stale events
+/// (from an old stream or a pause that arrived during the grace period) are
+/// ignored.
+pub fn reveal_window(app: &AppHandle, id: Option<String>) {
+    let active = {
+        let state = app.state::<AppState>();
+        let inner = state.lock();
+        inner.playback.is_active()
+            && !inner.playback.paused
+            && id.as_deref() == inner.playback.id.as_deref()
+    };
+    if !active {
+        return;
+    }
+    if let Some(window) = app.get_webview_window(WALLPAPER_LABEL) {
+        if let Some(hwnd) = raw_hwnd(&window) {
+            desktop::show_raw(hwnd);
+        }
+        let _ = window.show();
+    }
+}
+
 fn emit_play(app: &AppHandle, playback: &Playback) {
     if let Some(window) = app.get_webview_window(WALLPAPER_LABEL) {
         let _ = window.emit("wallpaper:play", playback.clone());
@@ -235,6 +257,11 @@ fn emit_pause(app: &AppHandle, playback: &Playback) {
         paused: playback.paused,
         reason: playback.pause_reason.clone(),
     };
+    // The iframe can briefly show its own controls while pausing. Hide the
+    // wallpaper first, then let the renderer call pauseVideo().
+    if playback.paused && playback.engine == "embed" {
+        hide_window(app);
+    }
     if let Some(window) = app.get_webview_window(WALLPAPER_LABEL) {
         let _ = window.emit("wallpaper:pause", payload);
     }
@@ -273,24 +300,57 @@ pub async fn apply_entry(
         (entry, quality, inner.settings.clone())
     };
 
+    storage::append_log(
+        app,
+        &format!(
+            "diag: apply video={} quality={} force_embed={force_embed}",
+            entry.video_id, quality
+        ),
+    );
+
     // Direct, ad-free stream through yt-dlp (video-only: wallpapers are muted).
     let mut resolved: Result<String, String> = Err("yt-dlp недоступен".to_string());
-    if !force_embed {
-        if let Some(exe) = ytdlp::locate(&settings.ytdlp_path) {
-            let url = entry.url.clone();
-            let quality_job = quality.clone();
-            resolved = match tauri::async_runtime::spawn_blocking(move || {
-                ytdlp::resolve(&exe, &url, &quality_job)
-            })
-            .await
-            {
-                Ok(result) => result,
-                Err(error) => Err(error.to_string()),
-            };
-        }
+    let mut fallback_reason: Option<String> = None;
+    if force_embed {
+        fallback_reason =
+            Some("поток yt-dlp не играет: принудительный переход на embed".to_string());
+    } else if let Some(exe) = ytdlp::locate(&settings.ytdlp_path) {
+        let name = exe
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "yt-dlp".to_string());
+        storage::append_log(app, &format!("diag: найден {name}"));
+        let url = entry.url.clone();
+        let quality_job = quality.clone();
+        resolved = match tauri::async_runtime::spawn_blocking(move || {
+            ytdlp::resolve(&exe, &url, &quality_job)
+        })
+        .await
+        {
+            Ok(result) => result,
+            Err(error) => Err(error.to_string()),
+        };
+    } else {
+        fallback_reason = Some(if settings.ytdlp_path.trim().is_empty() {
+            "yt-dlp не найден (папка приложения и PATH)".to_string()
+        } else {
+            "yt-dlp не найден по указанному пути".to_string()
+        });
     }
 
-    let engine = if resolved.is_ok() { "direct" } else { "embed" };
+    let (engine, reason, stream_url) = match resolved {
+        Ok(url) => (
+            "direct",
+            format!("прямой поток yt-dlp ({quality})"),
+            Some(url),
+        ),
+        Err(error) => {
+            let reason = fallback_reason.unwrap_or_else(|| format!("ошибка yt-dlp: {error}"));
+            ("embed", reason, None)
+        }
+    };
+    storage::append_log(app, &format!("diag: engine={engine} reason={reason}"));
+
     let mut playback = Playback {
         id: Some(entry.id.clone()),
         video_id: Some(entry.video_id.clone()),
@@ -299,7 +359,8 @@ pub async fn apply_entry(
         quality: quality.clone(),
         fit: entry.fit_mode.clone(),
         engine: engine.to_string(),
-        stream_url: resolved.ok(),
+        engine_reason: Some(reason),
+        stream_url,
         paused: false,
         pause_reason: None,
         stream_width: 0,
@@ -324,6 +385,9 @@ pub async fn apply_entry(
 
     ensure_window(app)?;
     attach_window(app);
+    // Both engines stay hidden until the renderer reports a real PLAYING event.
+    // This also keeps YouTube's first-frame controls off the desktop.
+    hide_window(app);
     emit_play(app, &playback);
     emit_library(app);
     Ok(playback)
@@ -389,11 +453,7 @@ pub fn set_fit(app: &AppHandle, mode: &str) -> Result<Playback, String> {
         inner.settings.fit = fit.clone();
         inner.playback.fit = fit.clone();
         if let Some(active_id) = inner.playback.id.clone() {
-            if let Some(entry) = inner
-                .library
-                .iter_mut()
-                .find(|entry| entry.id == active_id)
-            {
+            if let Some(entry) = inner.library.iter_mut().find(|entry| entry.id == active_id) {
                 entry.fit_mode = fit.clone();
             }
         }
@@ -418,7 +478,8 @@ pub fn apply_settings(app: &AppHandle, mut settings: Settings) -> Result<Setting
         let inner = state.lock();
         inner.settings.autostart
     };
-    if settings.autostart != previously_enabled || (settings.autostart && !crate::autostart::is_enabled())
+    if settings.autostart != previously_enabled
+        || (settings.autostart && !crate::autostart::is_enabled())
     {
         crate::autostart::set_enabled(settings.autostart)?;
     }
@@ -593,6 +654,7 @@ pub async fn stream_failed(app: &AppHandle) -> Result<Playback, String> {
     let Some(id) = id else {
         return Err("нет активных обоев".to_string());
     };
+    storage::append_log(app, "diag: прямой поток не играет — fallback на embed");
     apply_entry(app, &id, None, true).await
 }
 
@@ -659,6 +721,8 @@ pub fn auto_apply_last(app: &AppHandle) {
         tauri::async_runtime::spawn(async move {
             let _ = apply_entry(&app, &id, None, false).await;
         });
+    } else {
+        storage::append_log(app, "diag: запуск без активных обоев — движок не выбран");
     }
 }
 
@@ -696,5 +760,3 @@ mod tests {
         assert!(!flip.observe(false));
     }
 }
-
-

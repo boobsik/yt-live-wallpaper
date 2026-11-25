@@ -24,9 +24,29 @@
   let crossfading = false;
   let failedAt = 0;
   let fpsMeasuredFor = "";
+  let revealTimer = 0;
 
   const activeVideo = () => videos[activeIndex];
   const otherVideo = () => videos[1 - activeIndex];
+
+  function clearReveal() {
+    if (revealTimer) {
+      window.clearTimeout(revealTimer);
+      revealTimer = 0;
+    }
+  }
+
+  // The Rust side keeps the wallpaper hidden while a stream starts. Reveal it
+  // only after an actual PLAYING event plus a short grace period.
+  function scheduleReveal() {
+    if (!isTauri || revealTimer || !playback || playback.paused) return;
+    const id = playback.id;
+    revealTimer = window.setTimeout(() => {
+      revealTimer = 0;
+      if (!playback || playback.paused || playback.id !== id) return;
+      invoke("wallpaper_playing", { id }).catch(() => {});
+    }, 300);
+  }
 
   function setFit(fit) {
     stage.dataset.fit = ["cover", "contain", "fill"].includes(fit) ? fit : "cover";
@@ -35,6 +55,7 @@
 
   function setPaused(paused) {
     const isPaused = Boolean(paused);
+    if (isPaused) clearReveal();
     if (playback) playback.paused = isPaused;
     if (player && typeof player.pauseVideo === "function") {
       try {
@@ -91,6 +112,7 @@
   }
 
   function stopAll() {
+    clearReveal();
     stopVideos();
     destroyPlayer();
     crossfading = false;
@@ -301,16 +323,15 @@
       videoId,
       playerVars: {
         autoplay: 1,
-        mute: 1,
         controls: 0,
-        loop: 1,
-        playlist: videoId,
-        rel: 0,
-        modestbranding: 1,
-        playsinline: 1,
-        iv_load_policy: 3,
         disablekb: 1,
         fs: 0,
+        rel: 0,
+        iv_load_policy: 3,
+        playsinline: 1,
+        mute: 1,
+        loop: 1,
+        playlist: videoId,
       },
       events: {
         onReady: (event) => {
@@ -323,6 +344,9 @@
           }
         },
         onStateChange: (event) => {
+          if (event.data === yt.PlayerState.PLAYING) {
+            scheduleReveal();
+          }
           // Seamless loop: jump back to the first frame when the video ends.
           if (event.data === yt.PlayerState.ENDED) {
             try {
@@ -374,6 +398,9 @@
   function bindVideoEvents() {
     videos.forEach((video) => {
       video.addEventListener("timeupdate", onTimeUpdate);
+      video.addEventListener("playing", () => {
+        if (video === activeVideo()) scheduleReveal();
+      });
       video.addEventListener("error", () => {
         if (!playback || playback.engine !== "direct") return;
         if (!video.currentSrc || !video.error) return;

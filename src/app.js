@@ -62,6 +62,7 @@
     telNode: $("#tel-node"),
     telCpu: $("#tel-cpu"),
     telWebview: $("#tel-webview"),
+    telEngine: $("#tel-engine"),
     telMode: $("#tel-mode"),
 
     toastStack: $("#toast-stack"),
@@ -128,6 +129,7 @@
     quality: "1080p",
     fit: "cover",
     engine: "idle",
+    engineReason: null,
     streamUrl: null,
     paused: false,
     pauseReason: null,
@@ -251,6 +253,7 @@
       quality: entry.quality,
       fit: entry.fit_mode,
       engine: "direct",
+      engineReason: "демо-режим: yt-dlp не вызывается",
       streamUrl: "demo",
       paused: state.playback.paused,
       pauseReason: state.playback.pauseReason,
@@ -274,7 +277,15 @@
       case "get_playback":
         return structuredClone(state.playback);
       case "get_runtime_stats":
-        return { nodeRamMb: 96.4, webviewRamMb: 184.2, cpu: 3.7, processes: 7, sampledAt: Date.now() };
+        return {
+          nodeRamMb: 96.4,
+          webviewRamMb: 184.2,
+          cpu: 3.7,
+          processes: 7,
+          sampledAt: Date.now(),
+          engine: state.playback.engine,
+          engineReason: state.playback.engineReason,
+        };
       case "add_wallpaper": {
         const videoId = parseVideoId(args.url);
         if (!videoId) throw new Error("Ссылка не похожа на YouTube-видео");
@@ -359,6 +370,7 @@
         return structuredClone(state.ytdlp);
       }
       case "report_stream":
+      case "wallpaper_playing":
       case "minimize_main":
       case "hide_main":
       case "show_main_window":
@@ -445,6 +457,7 @@
     els.spotQuality.textContent = active ? qualityLabel(playback.quality) : "—";
     els.spotFit.textContent = fitLabel(playback.fit || state.settings.fit);
     els.spotEngine.textContent = active ? engineLabel(playback.engine) : "—";
+    els.spotEngine.title = active ? playback.engineReason || "" : "";
     els.spotFps.textContent =
       active && Number(playback.fps) > 0 ? Number(playback.fps).toFixed(1) : "—";
 
@@ -539,6 +552,8 @@
   function renderTelemetry() {
     const playback = state.playback || idlePlayback();
     const active = Boolean(playback.id) && playback.engine !== "idle";
+    els.telEngine.textContent = active ? engineLabel(playback.engine).toUpperCase() : "—";
+    els.telEngine.title = active ? playback.engineReason || "" : "";
     els.telMode.textContent = !active
       ? "IDLE"
       : `${playback.paused ? "PAUSED" : "PLAYING"} · ${qualityLabel(playback.quality)} · ${fitLabel(

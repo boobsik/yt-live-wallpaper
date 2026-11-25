@@ -32,6 +32,7 @@ pub fn run() {
             commands::update_settings,
             commands::check_ytdlp,
             commands::report_stream,
+            commands::wallpaper_playing,
             commands::stream_failed,
             commands::minimize_main,
             commands::hide_main,

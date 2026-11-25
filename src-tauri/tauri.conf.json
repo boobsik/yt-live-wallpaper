@@ -20,7 +20,7 @@
         "resizable": true,
         "decorations": false,
         "transparent": false,
-        "backgroundColor": "#0B0C0E",
+        "backgroundColor": "#000000",
         "visible": true,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion,IntensiveWakeUpThrottling --autoplay-policy=no-user-gesture-required --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows"
       }

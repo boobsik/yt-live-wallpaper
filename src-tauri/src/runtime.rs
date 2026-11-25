@@ -257,6 +257,14 @@ fn emit_pause(app: &AppHandle, playback: &Playback) {
         paused: playback.paused,
         reason: playback.pause_reason.clone(),
     };
+    storage::append_log(
+        app,
+        &format!(
+            "diag: pause paused={} reason={}",
+            playback.paused,
+            playback.pause_reason.as_deref().unwrap_or("none")
+        ),
+    );
     // The iframe can briefly show its own controls while pausing. Hide the
     // wallpaper first, then let the renderer call pauseVideo().
     if playback.paused && playback.engine == "embed" {

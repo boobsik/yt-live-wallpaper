@@ -29,11 +29,12 @@ WebView2, интерфейс — vanilla HTML/CSS/JS без сборщика и 
   без звука, бесшовный цикл) и автоматический fallback на YouTube IFrame API,
   если `yt-dlp` не найден или поток не играет. В embed-режиме верхний YouTube chrome
   обрезается масштабированием iframe.
-- **Умная пауза.** Фоновый поток раз в ~700 мс проверяет foreground-окно. Если
-  стороннее приложение реально полноэкранное — воспроизведение ставится на паузу;
-  при выходе из полноэкранного режима воспроизведение продолжается без перезагрузки.
-  Собственные окна приложения, `Progman/WorkerW/SHELLDLL_DefView/SysListView32`,
-  панель задач и системные shell-окна игнорируются.
+- **Умная пауза.** Фоновый поток раз в ~700 мс проверяет окна на мониторе обоев:
+  полноэкранное foreground-приложение либо любое развёрнутое/почти полноэкранное
+  окно ставит воспроизведение на паузу, даже если оно не в фокусе. Состояние
+  меняется только после двух совпадающих проверок подряд. Собственные окна,
+  `Progman/WorkerW/SHELLDLL_DefView/SysListView32`, панель задач, системные
+  shell-окна и tool-окна игнорируются. Оба переключателя настраиваются отдельно.
 - **Трей.** Закрытие окна прячет его в трей, обои продолжают работать. Меню:
   «Открыть библиотеку», «Пауза / Возобновить», «Остановить обои», «Выход».
 - **Телеметрия.** RAM процесса и всех дочерних `msedgewebview2.exe`, CPU, режим
@@ -61,7 +62,7 @@ WebView2, интерфейс — vanilla HTML/CSS/JS без сборщика и 
 | --- | --- |
 | `src-tauri/src/win32/desktop.rs` | Поиск `WorkerW`, attach/detach, размер экрана, сохранение и восстановление системных обоев. |
 | `src-tauri/src/runtime.rs` | Жизненный цикл окна `wallpaper`, применение/остановка/пауза, фоновые потоки. |
-| `src-tauri/src/win32/power.rs` | Определение полноэкранного приложения. |
+| `src-tauri/src/win32/power.rs` | Определение полноэкранного и развёрнутого окна, покрывающего монитор обоев. |
 | `src-tauri/src/win32/stats.rs` | RAM/CPU по дереву процессов. |
 
 Перед первым применением обоев текущий системный фон сохраняется через
@@ -102,12 +103,12 @@ YouTube обрезается).
 
 Поток `power_worker` каждые ~700 мс:
 
-1. Берёт `GetForegroundWindow`, проверяет `IsWindowVisible`, `IsIconic`, `WS_CHILD`, cloaked state и `GetWindowRect`.
-2. Игнорирует собственные HWND приложения (main/wallpaper), свой PID и shell-классы: `Progman`, `WorkerW`, `SHELLDLL_DefView`, `SysListView32`, `Shell_TrayWnd`, `Shell_SecondaryTrayWnd`, `Windows.UI.Core.CoreWindow` и др.
-3. Сравнивает прямоугольник с монитором окна (допуск 2 px).
-4. Если стороннее окно полноэкранное и `smartPause` включён — эмитит `wallpaper:pause { paused: true, reason: "fullscreen" }`. При выходе из fullscreen эмитит `paused: false`.
+1. Проверяет `GetForegroundWindow` на полноэкранный режим (допуск 2 px по `rcMonitor`).
+2. Через `EnumWindows` перебирает все видимые top-level окна на мониторе обоев. Игнорируются собственные HWND и PID, свёрнутые/cloaked окна, `WS_EX_TOOLWINDOW`, shell-классы (`Progman`, `WorkerW`, `SHELLDLL_DefView`, `SysListView32`, `Shell_TrayWnd`, `Shell_SecondaryTrayWnd`, `Windows.UI.Core.CoreWindow` и др.).
+3. Пауза, если `IsZoomed` либо пересечение `GetWindowRect` с `rcWork` монитора ≥95%. Фон не важен: развёрнутое окно за другим окном тоже скрывает обои.
+4. Новое состояние фиксируется только после двух подряд совпадающих проверок, затем эмитится `wallpaper:pause` с причиной `fullscreen` или `maximized`.
 
-Важно: при smart-pause окно обоев **не закрывается и не уничтожается** — останавливается только воспроизведение (`video.pause()` / `player.pauseVideo()`), поэтому возврат происходит мгновенно. Ручная пауза и fullscreen-пауза независимы.
+Важно: при умной паузе окно обоев **не закрывается и не уничтожается** — останавливается только воспроизведение (`video.pause()` / `player.pauseVideo()`), поэтому возврат происходит мгновенно. Ручная пауза и автоматическая независимы.
 
 ### 4. Потоки и состояние
 
@@ -166,8 +167,9 @@ yt-live-wallpaper/
 - `library.json` — массив записей:
   `id`, `video_id`, `url`, `title`, `thumbnail_url`, `quality`, `fit_mode`,
   `added_at`, `last_used_at`, `channel` (необязательный).
-- `settings.json` — `smartPause`, `autostart`, `startMinimized`, `ytdlpPath`,
-  `quality`, `fit`.
+- `settings.json` — `pauseFullscreen`, `pauseMaximized`, `autostart`,
+  `startMinimized`, `ytdlpPath`, `quality`, `fit`. Старый ключ `smartPause`
+  при чтении превращается в `pauseFullscreen`.
 
 Запись атомарная: временный файл + `rename`, чтобы падение не портило библиотеку.
 

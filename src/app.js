@@ -49,7 +49,8 @@
     libraryEmpty: $("#library-empty"),
     libraryCount: $("#library-count"),
 
-    smartPause: $("#smart-pause"),
+    pauseFullscreen: $("#pause-fullscreen"),
+    pauseMaximized: $("#pause-maximized"),
     autostart: $("#autostart"),
     startMinimized: $("#start-minimized"),
     ytdlpPath: $("#ytdlp-path"),
@@ -138,7 +139,8 @@
   let state = {
     playback: idlePlayback(),
     settings: {
-      smartPause: true,
+      pauseFullscreen: true,
+      pauseMaximized: true,
       autostart: false,
       startMinimized: false,
       ytdlpPath: "",
@@ -396,6 +398,7 @@
     const active = Boolean(playback.id) && playback.engine !== "idle";
     const paused = Boolean(playback.paused);
     const fullscreen = playback.pauseReason === "fullscreen";
+    const maximized = playback.pauseReason === "maximized";
 
     const thumb = playback.thumbnailUrl;
     els.spotPreview.classList.toggle("has-thumb", Boolean(thumb));
@@ -415,7 +418,11 @@
     els.spotPreviewStatus.classList.remove("is-active", "is-paused");
     els.spotPreviewLabel.textContent = "IDLE";
     if (active && paused) {
-      statusText = fullscreen ? "Пауза · полный экран" : "Пауза";
+      statusText = fullscreen
+        ? "Пауза · полный экран"
+        : maximized
+          ? "Пауза · развёрнутое окно"
+          : "Пауза";
       els.spotStatus.classList.add("is-paused");
       els.spotPreviewStatus.classList.add("is-paused");
       els.spotPreviewLabel.textContent = "PAUSED";
@@ -510,7 +517,8 @@
     const settings = state.settings || {};
     const playback = state.playback || {};
     const active = Boolean(playback.id) && playback.engine !== "idle";
-    els.smartPause.checked = Boolean(settings.smartPause);
+    els.pauseFullscreen.checked = Boolean(settings.pauseFullscreen);
+    els.pauseMaximized.checked = Boolean(settings.pauseMaximized);
     els.autostart.checked = Boolean(settings.autostart);
     els.startMinimized.checked = Boolean(settings.startMinimized);
     if (document.activeElement !== els.ytdlpPath) {
@@ -550,7 +558,8 @@
 
   function collectSettings() {
     return {
-      smartPause: els.smartPause.checked,
+      pauseFullscreen: els.pauseFullscreen.checked,
+      pauseMaximized: els.pauseMaximized.checked,
       autostart: els.autostart.checked,
       startMinimized: els.startMinimized.checked,
       ytdlpPath: els.ytdlpPath.value.trim(),
@@ -883,7 +892,7 @@
       button.addEventListener("click", () => setFit(button.dataset.fit));
     });
 
-    [els.smartPause, els.autostart, els.startMinimized].forEach((input) => {
+    [els.pauseFullscreen, els.pauseMaximized, els.autostart, els.startMinimized].forEach((input) => {
       input.addEventListener("change", async () => {
         const ok = await saveSettings({ silent: false });
         if (!ok) renderSettings();

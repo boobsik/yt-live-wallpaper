@@ -30,6 +30,33 @@ const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreen
 
 pub static RUNNING: AtomicBool = AtomicBool::new(true);
 
+/// A detector value only changes after the same reading appears twice in a row.
+#[derive(Default)]
+struct FlipFlop {
+    stable: bool,
+    pending: Option<bool>,
+}
+
+impl FlipFlop {
+    fn observe(&mut self, value: bool) -> bool {
+        if self.stable == value {
+            self.pending = None;
+        } else if self.pending == Some(value) {
+            self.stable = value;
+            self.pending = None;
+        } else {
+            self.pending = Some(value);
+        }
+        self.stable
+    }
+}
+
+#[derive(Default)]
+struct PauseDetector {
+    fullscreen: FlipFlop,
+    maximized: FlipFlop,
+}
+
 pub struct Inner {
     pub settings: Settings,
     pub library: Vec<WallpaperEntry>,
@@ -37,6 +64,7 @@ pub struct Inner {
     pub ytdlp: YtdlpInfo,
     pub user_paused: bool,
     pub fullscreen: bool,
+    pub maximized: bool,
     pub original_wallpaper: String,
     pub stream_since: Option<Instant>,
     pub refreshing: bool,
@@ -45,14 +73,18 @@ pub struct Inner {
 
 impl Inner {
     pub fn effective_paused(&self) -> bool {
-        self.user_paused || (self.settings.smart_pause && self.fullscreen)
+        self.user_paused
+            || (self.settings.pause_fullscreen && self.fullscreen)
+            || (self.settings.pause_maximized && self.maximized)
     }
 
     pub fn pause_reason(&self) -> Option<String> {
         if !self.effective_paused() {
             None
-        } else if self.settings.smart_pause && self.fullscreen {
+        } else if self.settings.pause_fullscreen && self.fullscreen {
             Some("fullscreen".to_string())
+        } else if self.settings.pause_maximized && self.maximized {
+            Some("maximized".to_string())
         } else {
             Some("user".to_string())
         }
@@ -70,6 +102,7 @@ impl Inner {
 
 pub struct AppState {
     pub inner: Mutex<Inner>,
+    detector: Mutex<PauseDetector>,
 }
 
 impl AppState {
@@ -90,6 +123,7 @@ pub fn new_state(app: &AppHandle) -> AppState {
     }
     let original_wallpaper = desktop::capture_wallpaper();
     AppState {
+        detector: Mutex::new(PauseDetector::default()),
         inner: Mutex::new(Inner {
             settings,
             library,
@@ -97,6 +131,7 @@ pub fn new_state(app: &AppHandle) -> AppState {
             ytdlp: YtdlpInfo::default(),
             user_paused: false,
             fullscreen: false,
+            maximized: false,
             original_wallpaper,
             stream_since: None,
             refreshing: false,
@@ -404,14 +439,15 @@ pub fn apply_settings(app: &AppHandle, mut settings: Settings) -> Result<Setting
 // Smart pause / stream refresh workers
 // ---------------------------------------------------------------------------
 
-pub fn set_fullscreen(app: &AppHandle, fullscreen: bool) {
+fn set_cover_state(app: &AppHandle, fullscreen: bool, maximized: bool) {
     let state = app.state::<AppState>();
     let (changed, playback) = {
         let mut inner = state.lock();
-        if inner.fullscreen == fullscreen {
+        if inner.fullscreen == fullscreen && inner.maximized == maximized {
             (false, inner.playback.clone())
         } else {
             inner.fullscreen = fullscreen;
+            inner.maximized = maximized;
             inner.sync_pause();
             (true, inner.playback.clone())
         }
@@ -468,17 +504,39 @@ pub fn start_power_worker(app: &AppHandle) {
                 break;
             }
             tick = tick.wrapping_add(1);
-            let enabled = {
+            let (pause_fullscreen, pause_maximized, shutting_down) = {
                 let state = app.state::<AppState>();
                 let inner = state.lock();
-                inner.settings.smart_pause && !inner.shutting_down
+                (
+                    inner.settings.pause_fullscreen,
+                    inner.settings.pause_maximized,
+                    inner.shutting_down,
+                )
             };
-            // Never treat our own windows as "fullscreen app": that was causing
-            // the wallpaper to auto-pause ~1s after launch. We only pause/resume
-            // playback — the wallpaper window stays attached to WorkerW.
-            let own = own_hwnds(&app);
-            let fullscreen = enabled && power::fullscreen_foreground(&own);
-            set_fullscreen(&app, fullscreen);
+            if !shutting_down {
+                // Never treat our own windows as a covering app: that used to
+                // pause the wallpaper ~1s after launch. We only pause/resume
+                // playback — the wallpaper window stays attached to WorkerW.
+                let own = own_hwnds(&app);
+                let wallpaper = app
+                    .get_webview_window(WALLPAPER_LABEL)
+                    .and_then(|window| raw_hwnd(&window))
+                    .unwrap_or_default();
+                let fullscreen = pause_fullscreen && power::fullscreen_foreground(&own);
+                let maximized = pause_maximized && power::covering_window(&own, wallpaper);
+
+                // A single stray reading (window being created/destroyed) must
+                // not flicker the wallpaper; require two identical samples.
+                let state = app.state::<AppState>();
+                let mut detector = state
+                    .detector
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                let stable_fullscreen = detector.fullscreen.observe(fullscreen);
+                let stable_maximized = detector.maximized.observe(maximized);
+                drop(detector);
+                set_cover_state(&app, stable_fullscreen, stable_maximized);
+            }
             if tick % 8 == 0 {
                 verify_attachment(&app);
             }
@@ -621,6 +679,22 @@ pub fn refresh_ytdlp(app: &AppHandle) {
             set_ytdlp(&app, info);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FlipFlop;
+
+    #[test]
+    fn debounce_needs_two_identical_readings() {
+        let mut flip = FlipFlop::default();
+        assert!(!flip.observe(true));
+        assert!(flip.observe(true));
+        assert!(flip.observe(false));
+        assert!(flip.observe(true));
+        assert!(flip.observe(false));
+        assert!(!flip.observe(false));
+    }
 }
 
 

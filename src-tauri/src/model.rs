@@ -4,8 +4,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    /// Pause wallpaper automatically when a fullscreen app/game is in foreground.
-    pub smart_pause: bool,
+    /// Pause when a fullscreen app/game is in foreground. `smartPause` is the
+    /// legacy key from before the maximized-window detector was added.
+    #[serde(alias = "smartPause")]
+    pub pause_fullscreen: bool,
+    /// Pause when any window covers the wallpaper's monitor (maximized or >=95%).
+    #[serde(default = "default_true")]
+    pub pause_maximized: bool,
     /// Launch with Windows (HKCU Run key).
     pub autostart: bool,
     /// Start hidden in the tray.
@@ -18,10 +23,15 @@ pub struct Settings {
     pub fit: String,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            smart_pause: true,
+            pause_fullscreen: true,
+            pause_maximized: true,
             autostart: false,
             start_minimized: false,
             ytdlp_path: String::new(),
@@ -207,6 +217,13 @@ mod tests {
         assert_eq!(quality_max_height("1440p"), 1440);
         assert_eq!(quality_max_height("1080p"), 1080);
         assert_eq!(quality_max_height("unknown"), 1080);
+    }
+
+    #[test]
+    fn legacy_smart_pause_setting_migrates() {
+        let settings: Settings = serde_json::from_str(r#"{"smartPause":false}"#).unwrap();
+        assert!(!settings.pause_fullscreen);
+        assert!(settings.pause_maximized);
     }
 
     #[test]

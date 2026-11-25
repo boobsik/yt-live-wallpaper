@@ -22,6 +22,7 @@
     engineChip: $("#engine-chip"),
     engineChipText: $("#engine-chip-text"),
     composerNote: $("#composer-note"),
+    composerStatus: $("#composer-status"),
 
     spotPreview: $("#spot-preview"),
     spotThumb: $("#spot-thumb"),
@@ -230,7 +231,7 @@
     requestAnimationFrame(() => node.classList.add("is-in"));
     window.setTimeout(() => {
       node.classList.remove("is-in");
-      window.setTimeout(() => node.remove(), 220);
+      window.setTimeout(() => node.remove(), 140);
     }, 3400);
   }
 
@@ -446,9 +447,19 @@
     }
     els.spotStatusText.textContent = statusText;
 
+    els.composerStatus.textContent = !active
+      ? "// ВИДЕО ЗА ИКОНКАМИ. ОЖИДАНИЕ."
+      : paused && maximized
+        ? "// ВИДЕО ЗА ИКОНКАМИ. ОКНО РАЗВЁРНУТО — ПАУЗА."
+        : paused && fullscreen
+          ? "// ВИДЕО ЗА ИКОНКАМИ. ПОЛНЫЙ ЭКРАН — ПАУЗА."
+          : paused
+            ? "// ВИДЕО ЗА ИКОНКАМИ. ПАУЗА."
+            : "// ВИДЕО ЗА ИКОНКАМИ. ВОСПРОИЗВЕДЕНИЕ.";
+
     els.spotTitle.textContent = active ? playback.title || "Без названия" : "Обои не выбраны";
     els.spotSub.textContent = active
-      ? `YouTube · ${playback.videoId || "—"}`
+      ? `${playback.engine || "—"} · ${qualityLabel(playback.quality)}`
       : "Добавьте ссылку выше или выберите видео из библиотеки.";
 
     const width = Number(playback.streamWidth) || 0;

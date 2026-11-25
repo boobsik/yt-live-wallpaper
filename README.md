@@ -12,9 +12,28 @@ WebView2, интерфейс — vanilla HTML/CSS/JS без сборщика и 
 
 ---
 
-## Скриншот
+## Скриншоты
 
-![Окно библиотеки yt-live-wallpaper](docs/screenshots/01-manager-library.png)
+![Окно библиотеки: добавление и текущие обои](docs/screenshots/01-manager-theme.jpg)
+
+![Настройки и телеметрия](docs/screenshots/02-manager-settings.jpg)
+
+## Интерфейс
+
+Окно приложения оформлено в теме «black metal / zine»: чистый чёрный фон,
+жёсткие 2 px рамки без скруглений, моноширинный текст и один красный акцент.
+Палитра определена только переменными в `src/styles.css`: `--bg`, `--fg`,
+`--dim`, `--line`, `--red`. Красный используется только для главной кнопки
+«Применить», активных обоев, креста в логотипе, ошибок, фокуса с клавиатуры
+и выделения текста. В остальном интерфейс чёрно-белый.
+
+`Pirata One` идёт только на логотип и крупные заголовки латиницей (`add wallpaper`,
+`live wallpaper`, `library`, `settings`). Под каждым заголовком — русская подпись
+в `Space Mono` заглавными. Остальной текст, включая кириллицу, — `Space Mono`
+с fallback на Consolas: в обоих шрифтах кириллицы нет.
+
+Файлы шрифтов лежат в `src/ui/fonts/`, лицензия — `src/ui/fonts/OFL.txt`.
+Сеть для загрузки шрифтов не используется.
 
 ## Что умеет
 
@@ -142,8 +161,9 @@ yt-live-wallpaper/
 ├─ README.md
 ├─ src/                      # фронтенд, отдаётся Tauri как есть
 │  ├─ index.html             # окно библиотеки (960×640)
-│  ├─ styles.css             # токены, панели, карточки, тумблеры, тосты
+│  ├─ styles.css             # палитра, шрифты, панели, карточки, тосты
 │  ├─ app.js                 # команды, события, поиск, телеметрия, demo-режим
+│  ├─ ui/fonts/              # Pirata One и Space Mono (woff2 + OFL.txt)
 │  ├─ wallpaper.html         # страница обоев (без интерфейса)
 │  ├─ wallpaper.css
 │  └─ wallpaper.js           # direct + embed, кроссфейд, FPS
@@ -152,6 +172,8 @@ yt-live-wallpaper/
    ├─ tauri.conf.json
    ├─ capabilities/default.json
    ├─ icons/
+   │  ├─ icon-source.svg     # исходник иконки: чёрный квадрат, белый крест
+   │  └─ icon-1024.png       # PNG для tauri icon
    └─ src/
       ├─ main.rs             # точка входа
       ├─ lib.rs              # builder, setup, tray, RunEvent::Exit
@@ -254,6 +276,15 @@ cargo tauri build
 | Окно не открывается из трея | Второй экземпляр блокируется `single-instance` и поднимает первый. |
 
 ---
+
+## Credits
+
+- [Pirata One](https://fonts.google.com/specimen/Pirata+One) — Rodrigo Fuenzalida,
+  Nicolas Massi. Лицензия SIL OFL 1.1.
+- [Space Mono](https://fonts.google.com/specimen/Space+Mono) — The Space Mono
+  Project Authors. Лицензия SIL OFL 1.1.
+
+Обе лицензии включены в `src/ui/fonts/OFL.txt`.
 
 ## Лицензия
 

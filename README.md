@@ -29,8 +29,8 @@ WebView2, интерфейс — vanilla HTML/CSS/JS без сборщика и 
 
 `Pirata One` идёт только на логотип и крупные заголовки латиницей (`add wallpaper`,
 `live wallpaper`, `library`, `settings`). Под каждым заголовком — русская подпись
-в `Space Mono` заглавными. Остальной текст, включая кириллицу, — `Space Mono`
-с fallback на Consolas: в обоих шрифтах кириллицы нет.
+заглавными. Остальной текст, включая кириллицу, — `JetBrains Mono` (Regular и Bold,
+латиница и кириллица) с fallback на Consolas.
 
 Файлы шрифтов лежат в `src/ui/fonts/`, лицензия — `src/ui/fonts/OFL.txt`.
 Сеть для загрузки шрифтов не используется.
@@ -163,7 +163,7 @@ yt-live-wallpaper/
 │  ├─ index.html             # окно библиотеки (960×640)
 │  ├─ styles.css             # палитра, шрифты, панели, карточки, тосты
 │  ├─ app.js                 # команды, события, поиск, телеметрия, demo-режим
-│  ├─ ui/fonts/              # Pirata One и Space Mono (woff2 + OFL.txt)
+│  ├─ ui/fonts/              # Pirata One и JetBrains Mono (woff2 + OFL.txt)
 │  ├─ wallpaper.html         # страница обоев (без интерфейса)
 │  ├─ wallpaper.css
 │  └─ wallpaper.js           # direct + embed, кроссфейд, FPS
@@ -281,8 +281,8 @@ cargo tauri build
 
 - [Pirata One](https://fonts.google.com/specimen/Pirata+One) — Rodrigo Fuenzalida,
   Nicolas Massi. Лицензия SIL OFL 1.1.
-- [Space Mono](https://fonts.google.com/specimen/Space+Mono) — The Space Mono
-  Project Authors. Лицензия SIL OFL 1.1.
+- [JetBrains Mono](https://www.jetbrains.com/lp/mono/) — The JetBrains Mono Project
+  Authors. Лицензия SIL OFL 1.1.
 
 Обе лицензии включены в `src/ui/fonts/OFL.txt`.
 

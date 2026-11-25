@@ -10,16 +10,16 @@
 }
 
 @font-face {
-  font-family: "Space Mono";
-  src: url("ui/fonts/space-mono-latin-400.woff2") format("woff2");
+  font-family: "JetBrains Mono";
+  src: url("ui/fonts/jetbrains-mono-regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Space Mono";
-  src: url("ui/fonts/space-mono-latin-700.woff2") format("woff2");
+  font-family: "JetBrains Mono";
+  src: url("ui/fonts/jetbrains-mono-bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -35,7 +35,7 @@
   --red: #e0001b;
 
   --display: "Pirata One", Consolas, monospace;
-  --mono: "Space Mono", Consolas, monospace;
+  --mono: "JetBrains Mono", Consolas, monospace;
 
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --fast: 120ms;
